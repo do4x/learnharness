@@ -60,7 +60,10 @@ export class CodexOwner {
 			if (!this.enabled() || revision !== this.revision) { client.close(); throw new Error("Codex connection changed."); }
 			this.clients.add(client);
 			client.onMessage((event) => {
-				if (event.method === "connection/closed") { this.clients.delete(client); void rm(cwd, { recursive: true, force: true }); }
+				if (event.method === "connection/closed") {
+					this.clients.delete(client);
+					void client.exited.then(() => rm(cwd, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }));
+				}
 			});
 			return client;
 		} catch (error) { await rm(cwd, { recursive: true, force: true }); throw error; }

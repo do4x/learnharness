@@ -34,7 +34,7 @@ export function CodexConnection() {
 		const timer = setInterval(() => { void request(); }, 2000);
 		return () => clearInterval(timer);
 	}, [status?.state, request]);
-	const label = status?.state === "connected" ? `Connected · ${status.modelCount} models`
+	const label = status?.state === "connected" ? `Connected (${status.modelCount} models)`
 		: status?.state === "signing-in" ? "Complete sign-in in your browser"
 		: status?.state === "not-found" ? "Codex CLI not found" : status?.state === "signed-out" ? "Signed out"
 		: status?.state === "error" ? "Connection unavailable" : status ? "Disabled" : "Checking…";

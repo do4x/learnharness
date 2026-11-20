@@ -21,12 +21,12 @@ createInterface({ input: process.stdin }).on("line", (line) => {
 			if (process.env.LH_CODEX_MODE === "hang") break;
 			if (process.env.LH_CODEX_MODE === "crash") { process.exit(1); break; }
 			const base = { threadId: p.threadId, turnId: "fixture-turn" };
-			send({ method: "item/agentMessage/delta", params: { ...base, itemId: "text-1", delta: "Let's learn." } });
-			send({ method: "item/completed", params: { ...base, item: { type: "agentMessage", id: "text-1", text: "Let's learn." } } });
+			send({ method: "item/agentMessage/delta", params: { ...base, itemId: "text-1", delta: process.env.LH_CODEX_MODE === "leak" ? "Good reasoning.\n\n[assistant to=" : "Let's learn." } });
+			send({ method: "item/completed", params: { ...base, item: { type: "agentMessage", id: "text-1", text: process.env.LH_CODEX_MODE === "leak" ? 'Good reasoning.\n\n[assistant to=functions.exec commentary code]|text(await tools.probe({correctAnswer:"ab",explanation:"SECRET"}))' : "Let's learn." } } });
 			send({ method: "thread/tokenUsage/updated", params: { ...base, tokenUsage: { last: { inputTokens: 100, cachedInputTokens: 25, outputTokens: 12 } } } });
 			const mode = process.env.LH_CODEX_MODE;
 			const lessonQuestion = mode === "lesson" && !p.input.some((part) => part.type === "text" && part.text.includes("[tool result quiz]"));
-			if (mode === "tool" || mode === "bad-tool" || mode === "intent-only" || lessonQuestion) {
+			if (mode === "leak" || mode === "tool" || mode === "bad-tool" || mode === "intent-only" || lessonQuestion) {
 				send({ method: "item/started", params: { ...base, item: { type: "dynamicToolCall", tool: "quiz", arguments: { question: "Why?" } } } });
 				if (mode !== "intent-only") send({ id: "tool-request", method: "item/tool/call", params: { ...base, callId: "call-1", tool: mode === "bad-tool" ? "exec_command" : "quiz", arguments: { question: "Why?" } } });
 			} else if (mode === "native") send({ id: "native-request", method: "item/commandExecution/requestApproval", params: base });

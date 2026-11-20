@@ -195,3 +195,13 @@ test("disabling Codex terminates an already running model operation", async () =
 		assert.equal(owner.available(), false);
 	} finally { owner.close(); await rm(dir, { recursive: true, force: true }); }
 });
+
+test("protocol-shaped prose and answer keys never enter Codex stream events", async () => {
+ const stream = createCodexStream(() => fake("leak"))(model, context);
+ const events = []; for await (const event of stream) events.push(event);
+ const result = await stream.result();
+ assert.equal(result.stopReason, "toolUse");
+ assert.deepEqual(result.content.filter(b => b.type === "text"), [{type:"text",text:"Good reasoning."}]);
+ assert.equal(result.content.filter(b => b.type === "toolCall").length, 1);
+ for (const event of events) assert.doesNotMatch(JSON.stringify(event), /SECRET|correctAnswer|functions\.exec/);
+});

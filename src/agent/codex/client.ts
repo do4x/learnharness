@@ -5,13 +5,35 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import { externalCliEnv } from "../../core/auth-env.ts";
 
-export function getCodexBinary(): string | null {
+function codexSearchDirs(): string[] {
 	const home = homedir();
-	const dirs = [...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean), path.join(home, ".local/bin"),
+	return [...(process.env.PATH ?? "").split(path.delimiter).filter(Boolean), path.join(home, ".local/bin"),
 		"/opt/homebrew/bin", "/usr/local/bin", path.join(home, ".npm-global/bin")];
+
+}
+
+export function getCodexBinary(dirs = codexSearchDirs(), platform: NodeJS.Platform = process.platform, arch: string = process.arch): string | null {
+	const executable = (file: string) => {
+		try { accessSync(file, constants.X_OK); return statSync(file).isFile(); } catch { return false; }
+	};
 	for (const dir of dirs) {
-		const file = path.resolve(dir, process.platform === "win32" ? "codex.exe" : "codex");
-		try { accessSync(file, constants.X_OK); if (statSync(file).isFile()) return file; } catch { /* next candidate */ }
+		const file = path.resolve(dir, platform === "win32" ? "codex.exe" : "codex");
+		if (executable(file)) return file;
+		// npm puts codex.cmd on Windows PATH, not codex.exe. Resolve the same
+		// native optional package as the official launcher; never run a shell shim.
+		if (platform === "win32" && (arch === "x64" || arch === "arm64")) {
+			const root = path.resolve(dir, "node_modules", "@openai", "codex");
+			let vendor = path.join(root, "vendor");
+			try {
+				// Runtime-only discovery of a user-installed CLI, outside Next's graph.
+				const require = process.getBuiltinModule("module").createRequire(path.join(root, "package.json"));
+				const resolved = require.resolve(`@openai/codex-win32-${arch}/package.json`);
+				vendor = path.join(path.dirname(resolved), "vendor");
+			} catch { /* official launcher's bundled-vendor fallback */ }
+			const target = arch === "arm64" ? "aarch64-pc-windows-msvc" : "x86_64-pc-windows-msvc";
+			const native = path.join(vendor, target, "bin", "codex.exe");
+			if (executable(native)) return native;
+		}
 	}
 	return null;
 }
@@ -40,12 +62,15 @@ export type SpawnCodex = (binary: string, args: string[], options: { cwd: string
 
 /** Only the documented stdio JSON-RPC protocol crosses this boundary. */
 export class CodexClient {
+	/** Process exit, not logical RPC closure: Windows can still hold profile files. */
+	readonly exited: Promise<void>;
 	private sequence = 0;
 	private closed = false;
 	private pending = new Map<number, { resolve(value: any): void; reject(error: Error): void; timer: NodeJS.Timeout }>();
 	private listeners = new Set<CodexListener>();
 	private readonly lines;
 	constructor(private readonly child: ChildProcessWithoutNullStreams) {
+		this.exited = new Promise((resolve) => child.once("close", () => resolve()));
 		this.lines = createInterface({ input: child.stdout });
 		this.lines.on("line", (line) => {
 			try {

@@ -20,4 +20,8 @@ try {
 		dynamicTools: [{ type: "function", name: "quiz", description: "Pose a learning question", inputSchema: { type: "object", properties: { question: { type: "string" } }, required: ["question"] } }] });
 	assert(result.thread.id); assert.equal(result.model, model);
 	console.log("Codex native handshake, unsigned account, catalog, and ephemeral dynamic-tool thread passed. No inference requested.");
-} finally { client?.close(); await rm(directory, { recursive: true, force: true }); }
+} finally {
+	client?.close();
+	await client?.exited;
+	await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+}

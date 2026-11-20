@@ -1,3 +1,4 @@
+import { tutorText } from "./tutor-text.ts";
 /**
  * THE VIEW MODEL (Wave D, owner-approved 2026-09-26): the client's transcript
  * view — native record messages (+ the live turn's working messages) grouped
@@ -224,7 +225,7 @@ export function projectView(messages: readonly LhMessage[], live?: LiveTurnState
 			const streamingMessage = live?.streamingIds.has(m.id) === true;
 			for (const [contentIndex, block] of assistant.content.entries()) {
 				if (block.type === "text") {
-					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: block.text, state: "done" });
+					rest.push({ type: "text", id: `${m.id}-t${textN++}`, text: assistant.provider === "codex" ? tutorText(block.text) : block.text, state: "done" });
 				} else if (block.type === "thinking") {
 					reasoning.push({ type: "reasoning", id: `${m.id}-r${reasoningN++}`, text: block.thinking, state: "done" });
 				} else if (block.type === "toolCall") {
